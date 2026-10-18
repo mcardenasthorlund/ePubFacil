@@ -1,5 +1,5 @@
 export const APP_NAME = 'ePubFacil';
-export const APP_VERSION = '0.2-beta';
+export const APP_VERSION = '0.3-beta';
 export const APP_TAGLINE = 'Conversor de documentos a ePub';
 export const AUTHOR_NAME = 'Manuel Cárdenas Thorlund';
 export const AUTHOR_URL = 'https://nuevasideas.es';

@@ -334,6 +334,7 @@ export class LibraryView {
               <button data-action="edit" title="Editar capítulos" class="p-1.5 rounded text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg></button>
               <button data-action="export" title="Exportar ePub" class="p-1.5 rounded text-[#2563EB] hover:bg-blue-50 transition cursor-pointer"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></button>
               <button data-action="clone" title="Duplicar" class="p-1.5 rounded text-slate-400 hover:text-[#2563EB] hover:bg-blue-50 transition cursor-pointer"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="13" height="13" x="9" y="9" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>
+              <button data-action="move" title="Mover a otra carpeta" class="p-1.5 rounded text-slate-400 hover:text-[#2563EB] hover:bg-blue-50 transition cursor-pointer"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg></button>
               <button data-action="delete" title="Eliminar" class="p-1.5 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 transition cursor-pointer"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
             </div>
           </div>
@@ -370,6 +371,7 @@ export class LibraryView {
               <button data-action="edit" class="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-bold transition cursor-pointer"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg><span class="hidden sm:inline">Editar</span></button>
               <button data-action="export" title="Exportar ePub" class="p-2 rounded-lg text-[#2563EB] hover:bg-blue-50 transition cursor-pointer"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></button>
               <button data-action="clone" title="Duplicar" class="p-2 rounded-lg text-slate-400 hover:text-[#2563EB] hover:bg-blue-50 transition cursor-pointer"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="13" height="13" x="9" y="9" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>
+              <button data-action="move" title="Mover a otra carpeta" class="p-2 rounded-lg text-slate-400 hover:text-[#2563EB] hover:bg-blue-50 transition cursor-pointer"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg></button>
               <button data-action="delete" title="Eliminar" class="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition cursor-pointer"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
             </div>
           </div>
@@ -449,6 +451,7 @@ export class LibraryView {
           else if (action === 'edit') this.callbacks.onOpenProject(id);
           else if (action === 'export') this.callbacks.onExportProject(id);
           else if (action === 'clone') this.handleClone(id);
+          else if (action === 'move') this.handleMove(id);
           else if (action === 'delete') this.handleDelete(id);
         });
       });
@@ -493,6 +496,144 @@ export class LibraryView {
     } catch (err) {
       showToast({ message: 'Error al duplicar el libro', type: 'error' });
     }
+  }
+
+  /** Builds a depth-ordered list of destination folders (root first). */
+  private folderOptions(excludeId?: number): { id: number | null; name: string; depth: number }[] {
+    const options: { id: number | null; name: string; depth: number }[] = [
+      { id: null, name: 'Biblioteca (raíz)', depth: 0 },
+    ];
+    const byParent = new Map<number | null, FolderRecord[]>();
+    for (const folder of this.folders) {
+      if (folder.id === excludeId) continue;
+      const key = folder.parentId ?? null;
+      if (!byParent.has(key)) byParent.set(key, []);
+      byParent.get(key)!.push(folder);
+    }
+    const walk = (parentId: number | null, depth: number) => {
+      const children = (byParent.get(parentId) ?? []).sort((a, b) => a.name.localeCompare(b.name, 'es'));
+      for (const child of children) {
+        options.push({ id: child.id ?? null, name: child.name, depth });
+        if (child.id != null) walk(child.id, depth + 1);
+      }
+    };
+    walk(null, 1);
+    return options;
+  }
+
+  private handleMove(id: number) {
+    const project = this.projects.find((p) => p.id === id);
+    if (!project) return;
+
+    const options = this.folderOptions();
+    const current = project.folderId ?? null;
+
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4';
+    modal.innerHTML = `
+      <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-slate-100 flex flex-col max-h-[85vh]">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-10 h-10 rounded-xl bg-blue-50 text-[#2563EB] flex items-center justify-center shrink-0">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+          </div>
+          <div class="min-w-0">
+            <h3 class="text-base font-bold text-slate-900">Mover libro</h3>
+            <p class="text-xs text-slate-500 truncate" title="${escapeHtml(project.title)}">${escapeHtml(project.title)}</p>
+          </div>
+        </div>
+        <p class="text-xs font-semibold text-slate-500 mb-2">Elige la carpeta de destino</p>
+        <div class="overflow-auto flex flex-col gap-1">
+          ${options
+            .map(
+              (o) => `<button data-folder="${o.id ?? 'root'}" class="flex items-center gap-2 w-full text-left px-3 py-2 rounded-lg text-sm transition cursor-pointer ${
+                current === o.id ? 'bg-blue-50 text-[#2563EB] font-semibold' : 'text-slate-700 hover:bg-slate-50'
+              }">
+              <svg class="w-4 h-4 shrink-0 ${current === o.id ? 'text-[#2563EB]' : 'text-slate-400'}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${
+                o.id === null
+                  ? '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>'
+                  : '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>'
+              }</svg>
+              <span class="truncate" style="padding-left:${o.depth * 14}px">${escapeHtml(o.name)}</span>
+              ${current === o.id ? '<span class="ml-auto text-[10px] font-semibold uppercase tracking-wide">Actual</span>' : ''}
+            </button>`
+            )
+            .join('')}
+        </div>
+        <div class="mt-5 flex items-center justify-between gap-2.5">
+          <button id="mv-new" class="text-xs font-semibold text-[#2563EB] hover:underline cursor-pointer">＋ Nueva carpeta</button>
+          <button id="mv-cancel" class="px-4 py-2 text-xs font-semibold rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 cursor-pointer">Cancelar</button>
+        </div>
+      </div>`;
+
+    const close = () => document.body.removeChild(modal);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) close();
+    });
+    modal.querySelector('#mv-cancel')?.addEventListener('click', close);
+
+    modal.querySelectorAll<HTMLElement>('[data-folder]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const value = btn.getAttribute('data-folder');
+        const folderId = value === 'root' ? null : Number(value);
+        close();
+        if (folderId === current) return;
+        await moveProject(id, folderId);
+        showToast({ message: `Libro movido a ${this.folderLabel(folderId)}.`, type: 'success' });
+        await this.load();
+      });
+    });
+
+    modal.querySelector('#mv-new')?.addEventListener('click', () => {
+      close();
+      this.openNewFolderModalForMove(id);
+    });
+
+    document.body.appendChild(modal);
+  }
+
+  private folderLabel(folderId: number | null): string {
+    if (folderId == null) return 'la biblioteca (raíz)';
+    const folder = this.folders.find((f) => f.id === folderId);
+    return folder ? `«${folder.name}»` : 'la carpeta elegida';
+  }
+
+  /** Asks for a folder name and moves the given book into the new folder. */
+  private openNewFolderModalForMove(projectId: number) {
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4';
+    modal.innerHTML = `
+      <div class="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl border border-slate-100">
+        <h3 class="text-base font-bold text-slate-900 mb-1">Nueva carpeta</h3>
+        <p class="text-xs text-slate-500 mb-4">El libro se moverá a la carpeta nueva.</p>
+        <input id="mv-folder-name" type="text" placeholder="Nombre de la carpeta…" class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-hidden focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] transition" />
+        <div class="mt-6 flex items-center justify-end gap-2.5">
+          <button id="mv-folder-cancel" class="px-4 py-2 text-xs font-semibold rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 cursor-pointer">Cancelar</button>
+          <button id="mv-folder-create" class="px-4 py-2 text-xs font-semibold rounded-xl bg-[#2563EB] hover:bg-blue-700 text-white cursor-pointer">Crear y mover</button>
+        </div>
+      </div>`;
+
+    const input = modal.querySelector<HTMLInputElement>('#mv-folder-name')!;
+    input.focus();
+
+    const close = () => document.body.removeChild(modal);
+    modal.querySelector('#mv-folder-cancel')?.addEventListener('click', close);
+    modal.querySelector('#mv-folder-create')?.addEventListener('click', async () => {
+      const name = input.value.trim();
+      if (!name) {
+        showToast({ message: 'Introduce un nombre para la carpeta.', type: 'warning' });
+        return;
+      }
+      close();
+      const newFolderId = await addFolder(name, this.currentFolderId);
+      await moveProject(projectId, newFolderId);
+      showToast({ message: `Libro movido a «${name}».`, type: 'success' });
+      await this.load();
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') modal.querySelector<HTMLElement>('#mv-folder-create')?.click();
+    });
+
+    document.body.appendChild(modal);
   }
 
   private handleDelete(id: number) {

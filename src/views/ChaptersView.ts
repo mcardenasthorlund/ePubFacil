@@ -13,6 +13,7 @@ import {
   updateProject,
 } from '../db/db';
 import { collectImageFileNames } from '../utils/htmlAssets';
+import { AutoSaver, saveStatusLabel, type SaveState } from '../utils/autosave';
 import type { AppView, AssetRecord, ChapterRecord, ProjectRecord } from '../types';
 
 export interface ChaptersCallbacks {
@@ -47,9 +48,18 @@ export class ChaptersView {
 
   private assetList: AssetRecord[] = [];
   private urlCache = new Map<string, string>();
+  private saver: AutoSaver;
+  private lastSavedAt?: Date;
 
   constructor(callbacks: ChaptersCallbacks) {
     this.callbacks = callbacks;
+    this.saver = new AutoSaver(() => this.persist().then(() => undefined), {
+      delay: 900,
+      onState: (state) => {
+        if (state === 'saved') this.lastSavedAt = new Date();
+        this.setStatus('#ch-status', state);
+      },
+    });
     this.stepNav = new StepNav((view) => {
       if (this.projectId) this.callbacks.onNavigate(view, this.projectId);
     });
@@ -61,7 +71,20 @@ export class ChaptersView {
     return this.container;
   }
 
+  /** Completes any pending auto-save (called before leaving the view). */
+  public async flush(): Promise<void> {
+    await this.saver.flush();
+  }
+
+  private setStatus(selector: string, state: SaveState) {
+    const el = document.querySelector<HTMLElement>(selector);
+    if (!el) return;
+    el.textContent = saveStatusLabel(state, this.lastSavedAt);
+    el.className = `text-[11px] font-medium ${state === 'error' ? 'text-red-500' : 'text-slate-400'}`;
+  }
+
   destroy() {
+    void this.saver.flush();
     this.sortable?.destroy();
     this.sortable = null;
     this.revokeUrls();
@@ -133,7 +156,8 @@ export class ChaptersView {
           <h1 class="text-2xl font-bold tracking-tight text-slate-900">Editar capítulos</h1>
           <p class="mt-1 text-sm text-slate-500">${escapeHtml(this.project?.title ?? '')}</p>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-3">
+          <span id="ch-status" data-savestatus class="hidden sm:inline text-[11px] font-medium text-slate-400"></span>
           <button id="ch-preview" class="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-medium transition cursor-pointer">
             <svg class="w-4 h-4 text-[#2563EB]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
             <span class="hidden sm:inline">Previsualizar</span>
@@ -215,24 +239,26 @@ export class ChaptersView {
           }
           this.chapters = reordered;
           this.render();
+          this.saver.schedule();
         },
       });
     }
 
-    this.container.querySelector('#ch-preview')?.addEventListener('click', () => {
+    this.container.querySelector('#ch-preview')?.addEventListener('click', async () => {
       this.collectFromDom();
-      this.persist().then(() => this.projectId && this.callbacks.onPreview(this.projectId));
+      await this.saver.flush();
+      if (this.projectId) this.callbacks.onPreview(this.projectId);
     });
 
     this.container.querySelector('#ch-next')?.addEventListener('click', async () => {
       this.collectFromDom();
-      const id = await this.persist();
-      if (id) this.callbacks.onNavigate('meta', id);
+      await this.saver.flush();
+      if (this.projectId) this.callbacks.onNavigate('meta', this.projectId);
     });
 
     this.container.querySelector('#ch-save')?.addEventListener('click', async () => {
       this.collectFromDom();
-      await this.persist();
+      await this.saver.flush();
       showToast({ message: 'Cambios guardados.', type: 'success' });
     });
 
@@ -240,6 +266,20 @@ export class ChaptersView {
       this.collectFromDom();
       this.chapters.push({ title: 'Nuevo capítulo', html: '<p></p>', include: true, wordCount: 0 });
       this.render();
+      this.saver.schedule();
+    });
+
+    this.container.querySelectorAll<HTMLInputElement>('.chapter-title').forEach((input) => {
+      input.addEventListener('input', () => {
+        this.collectFromDom();
+        this.saver.schedule();
+      });
+    });
+    this.container.querySelectorAll<HTMLInputElement>('.chapter-include').forEach((checkbox) => {
+      checkbox.addEventListener('change', () => {
+        this.collectFromDom();
+        this.saver.schedule();
+      });
     });
 
     this.container.querySelectorAll<HTMLElement>('.chapter-row').forEach((row) => {
@@ -251,6 +291,7 @@ export class ChaptersView {
           if (act === 'delete') {
             this.chapters.splice(index, 1);
             this.render();
+            this.saver.schedule();
           } else if (act === 'merge') {
             if (index < this.chapters.length - 1) {
               const a = this.chapters[index];
@@ -260,6 +301,7 @@ export class ChaptersView {
               a.wordCount = wordCount(a.html);
               this.chapters.splice(index + 1, 1);
               this.render();
+              this.saver.schedule();
             }
           } else if (act === 'edit') {
             this.openEditor(index);
@@ -291,6 +333,7 @@ export class ChaptersView {
             <input id="ce-title" type="text" class="min-w-0 flex-1 px-3 py-1.5 text-sm font-bold text-slate-900 bg-transparent rounded-md hover:bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-1 focus:ring-[#2563EB] border border-transparent focus:border-[#2563EB] transition" />
           </div>
           <div class="flex items-center gap-2 shrink-0">
+            <span id="ce-status" data-savestatus class="hidden md:inline text-[11px] font-medium text-slate-400"></span>
             <span id="ce-words" class="hidden sm:inline text-xs text-slate-400 font-mono"></span>
             <button id="ce-html-toggle" class="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 text-xs font-semibold hover:bg-slate-50 cursor-pointer">&lt;/&gt; HTML</button>
             <button id="ce-save" class="px-4 py-2 rounded-lg bg-[#2563EB] text-white text-xs font-semibold hover:bg-blue-700 shadow-sm shadow-blue-200 cursor-pointer">Guardar</button>
@@ -332,6 +375,7 @@ export class ChaptersView {
         btn.addEventListener('click', () => {
           if (Number(btn.getAttribute('data-goto')) !== current) {
             syncFromEditor();
+            editorSaver.schedule();
             current = Number(btn.getAttribute('data-goto'));
             loadCurrent();
           }
@@ -355,21 +399,20 @@ export class ChaptersView {
       chapter.wordCount = wordCount(chapter.html);
     };
 
-    let autosaveTimer: number | null = null;
-    const scheduleAutosave = () => {
-      if (autosaveTimer !== null) window.clearTimeout(autosaveTimer);
-      autosaveTimer = window.setTimeout(async () => {
-        autosaveTimer = null;
+    const editorSaver = new AutoSaver(
+      async () => {
         syncFromEditor();
         await this.persist();
-      }, 2500);
-    };
-    const cancelAutosave = () => {
-      if (autosaveTimer !== null) {
-        window.clearTimeout(autosaveTimer);
-        autosaveTimer = null;
+      },
+      {
+        delay: 900,
+        onState: (state) => {
+          if (state === 'saved') this.lastSavedAt = new Date();
+          this.setStatus('#ce-status', state);
+        },
       }
-    };
+    );
+    const scheduleAutosave = () => editorSaver.schedule();
 
     editor = new RichTextEditor({
       initialHtml: this.chapters[current].html,
@@ -405,17 +448,13 @@ export class ChaptersView {
     });
 
     overlay.querySelector('#ce-save')?.addEventListener('click', async () => {
-      cancelAutosave();
-      syncFromEditor();
-      await this.persist();
+      await editorSaver.flush();
       showToast({ message: 'Capítulo guardado.', type: 'success' });
       renderSidebar();
     });
 
     overlay.querySelector('#ce-close')?.addEventListener('click', async () => {
-      cancelAutosave();
-      syncFromEditor();
-      await this.persist();
+      await editorSaver.flush();
       editor?.destroy();
       this.revokeUrls();
       document.body.removeChild(overlay);

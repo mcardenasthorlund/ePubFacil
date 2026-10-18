@@ -2,6 +2,7 @@ import { showToast } from '../components/Toast';
 import { StepNav } from '../components/StepNav';
 import { getProject, getProjectAssets, updateProject } from '../db/db';
 import { generateCoverBlob, resizeCoverBlob } from '../utils/cover';
+import { AutoSaver, saveStatusLabel } from '../utils/autosave';
 import type { AppView, ProjectRecord } from '../types';
 
 export interface MetaCallbacks {
@@ -32,9 +33,18 @@ export class MetaCoverView {
   private coverBlob: Blob | null = null;
   private coverUrl: string | null = null;
   private firstImageBlob: Blob | null = null;
+  private saver: AutoSaver;
+  private lastSavedAt?: Date;
 
   constructor(callbacks: MetaCallbacks) {
     this.callbacks = callbacks;
+    this.saver = new AutoSaver(() => this.persistMeta(), {
+      delay: 900,
+      onState: (state) => {
+        if (state === 'saved') this.lastSavedAt = new Date();
+        this.setStatus(state);
+      },
+    });
     this.stepNav = new StepNav((view) => {
       if (this.projectId) this.callbacks.onNavigate(view, this.projectId);
     });
@@ -46,7 +56,20 @@ export class MetaCoverView {
     return this.container;
   }
 
+  /** Completes any pending auto-save (called before leaving the view). */
+  public async flush(): Promise<void> {
+    await this.saver.flush();
+  }
+
+  private setStatus(state: Parameters<typeof saveStatusLabel>[0]) {
+    const el = document.querySelector<HTMLElement>('#meta-status');
+    if (!el) return;
+    el.textContent = saveStatusLabel(state, this.lastSavedAt);
+    el.className = `text-[11px] font-medium ${state === 'error' ? 'text-red-500' : 'text-slate-400'}`;
+  }
+
   destroy() {
+    void this.saver.flush();
     this.revokeCover();
   }
 
@@ -85,10 +108,13 @@ export class MetaCoverView {
           <h1 class="text-2xl font-bold tracking-tight text-slate-900">Carátula y metadatos</h1>
           <p class="mt-1 text-sm text-slate-500">Datos que verás en los lectores de ePub.</p>
         </div>
-        <button id="meta-next" class="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#2563EB] text-white text-sm font-semibold hover:bg-blue-700 transition shadow-sm shadow-blue-200 cursor-pointer">
-          Exportar
-          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
-        </button>
+        <div class="flex items-center gap-3">
+          <span id="meta-status" data-savestatus class="hidden sm:inline text-[11px] font-medium text-slate-400"></span>
+          <button id="meta-next" class="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#2563EB] text-white text-sm font-semibold hover:bg-blue-700 transition shadow-sm shadow-blue-200 cursor-pointer">
+            Exportar
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+          </button>
+        </div>
       </div>
 
       <div class="grid lg:grid-cols-3 gap-6">
@@ -167,8 +193,8 @@ export class MetaCoverView {
     this.bind();
   }
 
-  private bind() {
-    const readForm = () => ({
+  private readFormValues() {
+    return {
       title: val('meta-title'),
       author: val('meta-author'),
       language: val('meta-language'),
@@ -178,21 +204,48 @@ export class MetaCoverView {
       brandName: val('meta-brand'),
       rights: val('meta-rights'),
       description: val('meta-description'),
+    };
+  }
+
+  private syncFormToProject() {
+    if (this.project) Object.assign(this.project, this.readFormValues());
+  }
+
+  private async persistMeta(): Promise<void> {
+    if (!this.projectId) return;
+    const form = this.readFormValues();
+    if (this.project) Object.assign(this.project, form);
+    await updateProject(this.projectId, {
+      ...form,
+      primaryColor: this.project?.primaryColor || '#2563EB',
+      coverBlob: this.coverBlob ?? undefined,
     });
+  }
+
+  private bind() {
+    // Every field change is auto-saved (debounced).
+    this.container
+      .querySelectorAll<
+        HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+      >('#meta-title, #meta-author, #meta-language, #meta-publisher, #meta-series, #meta-isbn, #meta-brand, #meta-rights, #meta-description')
+      .forEach((el) => {
+        el.addEventListener('input', () => this.saver.schedule());
+        el.addEventListener('change', () => this.saver.schedule());
+      });
 
     this.container.querySelectorAll<HTMLElement>('[data-color]').forEach((btn) => {
       btn.addEventListener('click', () => {
         if (!this.project) return;
         this.project.primaryColor = btn.getAttribute('data-color') || '#2563EB';
-        // Update selection styles.
         this.container.querySelectorAll<HTMLElement>('[data-color]').forEach((b) => {
           b.className = `w-8 h-8 rounded-full border-2 ${b === btn ? 'border-slate-800' : 'border-white shadow'} cursor-pointer`;
         });
+        this.saver.schedule();
       });
     });
 
     this.container.querySelector('#cover-generate')?.addEventListener('click', async () => {
-      const form = readForm();
+      const form = this.readFormValues();
       const color = this.project?.primaryColor || '#2563EB';
       const cover = await generateCoverBlob({
         title: form.title || 'Sin título',
@@ -202,7 +255,9 @@ export class MetaCoverView {
       });
       this.coverBlob = cover.blob;
       this.setCoverUrl();
+      this.syncFormToProject();
       this.render();
+      this.saver.schedule();
     });
 
     const upload = this.container.querySelector<HTMLInputElement>('#cover-upload');
@@ -212,39 +267,41 @@ export class MetaCoverView {
       const resized = await resizeCoverBlob(file);
       this.coverBlob = resized;
       this.setCoverUrl();
+      this.syncFormToProject();
       this.render();
+      this.saver.schedule();
     });
 
     this.container.querySelector('#cover-from-asset')?.addEventListener('click', async () => {
       if (this.firstImageBlob) {
         this.coverBlob = await resizeCoverBlob(this.firstImageBlob);
         this.setCoverUrl();
+        this.syncFormToProject();
         this.render();
+        this.saver.schedule();
       }
     });
 
     this.container.querySelector('#cover-remove')?.addEventListener('click', () => {
       this.coverBlob = null;
       this.setCoverUrl();
+      this.syncFormToProject();
       this.render();
+      this.saver.schedule();
     });
 
-    const save = async (navigate: boolean) => {
-      if (!this.projectId) return;
-      const form = readForm();
-      await updateProject(this.projectId, {
-        ...form,
-        primaryColor: this.project?.primaryColor || '#2563EB',
-        brandName: form.brandName,
-        coverBlob: this.coverBlob ?? undefined,
-      });
-      if (navigate) this.callbacks.onNavigate('export', this.projectId);
-      else showToast({ message: 'Metadatos guardados.', type: 'success' });
+    const finish = async (navigate: boolean) => {
+      await this.saver.flush();
+      if (navigate) {
+        if (this.projectId) this.callbacks.onNavigate('export', this.projectId);
+      } else {
+        showToast({ message: 'Metadatos guardados.', type: 'success' });
+      }
     };
 
-    this.container.querySelector('#meta-save')?.addEventListener('click', () => save(false));
-    this.container.querySelector('#meta-next')?.addEventListener('click', () => save(true));
-    this.container.querySelector('#meta-next2')?.addEventListener('click', () => save(true));
+    this.container.querySelector('#meta-save')?.addEventListener('click', () => void finish(false));
+    this.container.querySelector('#meta-next')?.addEventListener('click', () => void finish(true));
+    this.container.querySelector('#meta-next2')?.addEventListener('click', () => void finish(true));
   }
 }
 

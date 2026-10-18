@@ -117,7 +117,19 @@ export class EpubFacilApp {
     this.renderView();
   }
 
-  public setView(view: AppView, projectId?: number) {
+  private async flushCurrentView(): Promise<void> {
+    try {
+      if (this.currentView === 'chapters') await this.chaptersView.flush();
+      else if (this.currentView === 'meta') await this.metaView.flush();
+    } catch (err) {
+      console.warn('No se pudo completar el guardado antes de salir:', err);
+    }
+  }
+
+  public async setView(view: AppView, projectId?: number) {
+    if (view !== this.currentView) {
+      await this.flushCurrentView();
+    }
     this.currentView = view;
     if (projectId !== undefined) this.activeProjectId = projectId;
     this.renderView();
